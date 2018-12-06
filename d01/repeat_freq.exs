@@ -1,21 +1,23 @@
 defmodule Mathy do
-  def count_frequency(list), do: do_count_frequency(list, %{})
+  def count_running_frequency(list), do: do_count_frequency(list, list, %{}, 0)
 
-  defp do_count_frequency([], counts), do: counts
-  defp do_count_frequency([h|t], counts) do
-    if Map.has_key?(counts, h) do
-      do_count_frequency(t, Map.put(counts, h, counts[h] + 1))
+  defp do_count_frequency([], original, counts, sum) do
+    do_count_frequency(original, original, counts, sum)
+  end
+  defp do_count_frequency([h|t], original, counts, sum) do
+    if Map.has_key?(counts, sum) do
+      sum
     else
-      do_count_frequency(t, Map.put_new(counts, h, 1))
+      do_count_frequency(t, original, Map.put_new(counts, sum, 1), sum + h)
     end
   end
 end
 
 
 numbers =
-  File.stream!("test_freq_input.txt")
+  File.stream!("input.txt")
   |> Stream.map(&String.trim/1)
   |> Stream.map(&(String.to_integer(&1)))
   |> Enum.to_list
 
-IO.inspect Mathy.count_frequency(numbers)
+IO.inspect Mathy.count_running_frequency(numbers)

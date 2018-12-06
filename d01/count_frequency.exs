@@ -13,7 +13,7 @@ end
 
 
 numbers =
-  File.stream!("test_freq_input.txt")
+  File.stream!("input.txt")
   |> Stream.map(&String.trim/1)
   |> Stream.map(&(String.to_integer(&1)))
   |> Enum.to_list
