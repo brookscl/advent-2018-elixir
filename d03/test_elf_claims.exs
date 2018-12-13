@@ -44,12 +44,26 @@ defmodule ElfClaims do
   end
 end
 
-test_claims = [
-  "#1 @ 1,3: 4x4",
-  "#2 @ 3,1: 4x4",
-  "#3 @ 5,5: 2x2",
-]
+# test_claims = [
+#   "#1 @ 1,3: 4x4",
+#   "#2 @ 3,1: 4x4",
+#   "#3 @ 5,5: 2x2",
+# ]
 
-# claim = ElfClaims.parse_single_claim(hd(test_claims))
 
-IO.inspect ElfClaims.map_claims(test_claims)
+# claim_map = ElfClaims.map_claims(test_claims)
+
+# result = Enum.filter(claim_map, fn {_, v} -> v > 1  end)
+
+# IO.inspect length(result)
+
+real_claims =
+  File.stream!("elf_claims.txt")
+  |> Stream.map(&String.trim/1)
+  |> Enum.to_list
+
+claim_map = ElfClaims.map_claims(real_claims)
+
+result = Enum.filter(claim_map, fn {_, v} -> v > 1  end)
+
+IO.inspect length(result)
