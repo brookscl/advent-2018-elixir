@@ -5,11 +5,31 @@ defmodule ElfClaims do
 
   def parse_single_claim(claim) do
     %{
+      :id => extract_regex_as_integer(~r/^#([0-9]+?)\s/, claim),
       :col => extract_regex_as_integer(~r/\@ ([0-9]+?),/, claim),
       :row => extract_regex_as_integer(~r/,([0-9]+?):/, claim),
       :col_span => extract_regex_as_integer(~r/: ([0-9]+?)x/, claim),
       :row_span => extract_regex_as_integer(~r/x([0-9]+?)$/, claim)
     }
+  end
+
+  def find_nonoverlapping_claim(claim_list) do
+    claim_map = map_claims(claim_list)
+    do_find_nonoverlapping_claim(claim_list, MapSet.new(claim_map))
+  end
+
+  def do_find_nonoverlapping_claim([], _), do: -1
+
+  def do_find_nonoverlapping_claim([h|t], master_set) do
+    claim = parse_single_claim(h)
+    single_claim_map = map_a_claim(claim, %{})
+    single_claim_set = MapSet.new(single_claim_map)
+    intersect = MapSet.intersection(master_set, single_claim_set)
+    if MapSet.equal?(intersect, single_claim_set) do
+      claim.id
+    else
+      do_find_nonoverlapping_claim(t, master_set)
+    end
   end
 
   def map_claims(claim_list), do: do_map_claims(claim_list, %{})
@@ -57,6 +77,14 @@ end
 
 # IO.inspect length(result)
 
+# master_set = MapSet.new(claim_map)
+# single_claim_set = MapSet.new([{{1,3}, 1}])
+# IO.inspect master_set
+# subset = MapSet.intersection(master_set, MapSet.new([{{1,3}, 1}]))
+# IO.inspect MapSet.equal?(subset, single_claim_set)
+
+# IO.inspect ElfClaims.find_nonoverlapping_claim(test_claims)
+
 real_claims =
   File.stream!("elf_claims.txt")
   |> Stream.map(&String.trim/1)
@@ -67,3 +95,5 @@ claim_map = ElfClaims.map_claims(real_claims)
 result = Enum.filter(claim_map, fn {_, v} -> v > 1  end)
 
 IO.inspect length(result)
+
+IO.inspect ElfClaims.find_nonoverlapping_claim(real_claims)
