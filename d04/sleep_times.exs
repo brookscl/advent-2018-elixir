@@ -22,7 +22,7 @@ defmodule Guards do
   end
 
   def do_process_single_log("wakes", l, [], time_map, g, start) do
-    IO.puts("Guard #{g} waking @ #{l.minute}")
+    # IO.puts("Guard #{g} waking @ #{l.minute}")
     if Map.has_key?(time_map, g) do
       Map.put(time_map, g, time_map[g] + l.minute - start)
     else
@@ -63,7 +63,7 @@ defmodule Guards do
   def find_sleepiest_minute(unsorted_log, guard) do
     sorted_log = Enum.sort(unsorted_log)
     minute_map = do_find_sleepiest_minute(sorted_log, guard, %{})
-    IO.inspect minute_map
+    IO.inspect hd(Enum.sort_by(minute_map, &(-elem(&1, 1))))
     {minute, _} = hd(Enum.sort_by(minute_map, &(-elem(&1, 1))))
     minute
   end
@@ -84,9 +84,9 @@ defmodule Guards do
   end
 
   def do_process_sleepy("wakes", l, [], g, minute_map, current, start) do
-    if g == current do
-      IO.puts("Recording minutes for #{g} @ #{start} to #{l.minute}")
-      record_minutes(minute_map, start, l.minute)
+    if g == current or g == nil do
+      # IO.puts("Recording minutes for #{current} @ #{start} to #{l.minute}")
+      record_minutes(minute_map, current, start, l.minute-1)
     else
       minute_map
     end
@@ -97,17 +97,18 @@ defmodule Guards do
     do_process_sleepy(new_log.action, new_log, t, g, do_process_sleepy("wakes", l, [], g, minute_map, current, start), current, nil)
   end
 
-  def record_minutes(minute_map, start_time, end_time) do
-    do_record_minutes(minute_map, Enum.to_list(start_time..end_time))
+  def record_minutes(minute_map, g, start_time, end_time) do
+    do_record_minutes(minute_map, g, Enum.to_list(start_time..end_time))
   end
 
-  def do_record_minutes(minute_map, []), do: minute_map
+  def do_record_minutes(minute_map, _, []), do: minute_map
 
-  def do_record_minutes(minute_map, [h|t]) do
-    if Map.has_key?(minute_map, h) do
-      do_record_minutes(Map.put(minute_map, h, minute_map[h] + 1), t)
+  def do_record_minutes(minute_map, g, [h|t]) do
+    if Map.has_key?(minute_map, {g, h}) do
+      # IO.puts("  Bumping {#{g}-#{h}} to #{minute_map[{g,h}] + 1}")
+      do_record_minutes(Map.put(minute_map, {g, h}, minute_map[{g,h}] + 1), g, t)
     else
-      do_record_minutes(Map.put_new(minute_map, h, 1), t)
+      do_record_minutes(Map.put_new(minute_map, {g, h}, 1), g, t)
     end
   end
 end
@@ -146,5 +147,10 @@ sorted = Enum.sort_by(sleep_time_map, &(-elem(&1, 1)))
 IO.inspect sorted
 {sleepiest_guard, _} = Enum.at(sorted,0)
 IO.puts("Sleepiest Guard is #{sleepiest_guard}")
-minute = Guards.find_sleepiest_minute(guard_log, sleepiest_guard)
+# minute = Guards.find_sleepiest_minute(guard_log, sleepiest_guard)
+{_, minute} = Guards.find_sleepiest_minute(guard_log, sleepiest_guard)
 IO.puts("Final answer is: #{sleepiest_guard * minute}")
+overall = Guards.find_sleepiest_minute(guard_log, nil)
+IO.inspect overall
+{guard, minute} = overall
+IO.puts("Sleepiest minute answer is: #{guard * minute}")
