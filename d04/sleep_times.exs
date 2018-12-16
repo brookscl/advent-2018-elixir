@@ -6,13 +6,10 @@ defmodule Guards do
 
   def do_accumulate_sleep_times([], time_map), do: time_map
 
-  # TODO refactor to pattern match parameters for state validation
   def do_accumulate_sleep_times([h|t], time_map) do
     l = parse_single_log(h)
     do_process_single_log(l.action, l, t, time_map, nil, nil)
   end
-
-  # def do_process_single_log(_, _, [], time_map, _, _), do: time_map
 
   def do_process_single_log("begins", l, [h|t], time_map, _, _) do
     new_log = parse_single_log(h)
@@ -35,17 +32,16 @@ defmodule Guards do
 
   def do_process_single_log("wakes", l, [h|t], time_map, g, start) do
     new_log = parse_single_log(h)
-    IO.puts("Guard #{g} waking @ #{l.minute}")
-    if Map.has_key?(time_map, g) do
-      do_process_single_log(new_log.action, new_log, t, Map.put(time_map, g, time_map[g] + l.minute - start), g, nil)
-    else
-      do_process_single_log(new_log.action, new_log, t, Map.put_new(time_map, g, l.minute - start), g, nil)
-    end
+    do_process_single_log(new_log.action, new_log, t, do_process_single_log("wakes", l, [], time_map, g, start), g, nil)
   end
 
+  def do_extract_match_as_int(nil), do: nil
+  def do_extract_match_as_int(match_list) do
+    String.to_integer(hd(match_list))
+  end
 
   def extract_regex_as_integer(r, s) do
-    String.to_integer(hd(Regex.run(r, s, capture: :all_but_first)))
+    do_extract_match_as_int(Regex.run(r, s, capture: :all_but_first))
   end
 
   def do_extract_match(nil, _), do: nil
@@ -59,15 +55,66 @@ defmodule Guards do
     %{
       :date => extract_regex_as_string(~r/^\[(\d+-\d{2}-\d{2}) /, log_entry),
       :minute => extract_regex_as_integer(~r/\d{2}:(\d{2})]/, log_entry),
-      :guard => extract_regex_as_string(~r/Guard #(\d+)/, log_entry),
+      :guard => extract_regex_as_integer(~r/Guard #(\d+)/, log_entry),
       :action => extract_regex_as_string(~r/\] (Guard #\d+ )?(\w+) /, log_entry, 1),
     }
+  end
+
+  def find_sleepiest_minute(unsorted_log, guard) do
+    sorted_log = Enum.sort(unsorted_log)
+    minute_map = do_find_sleepiest_minute(sorted_log, guard, %{})
+    IO.inspect minute_map
+    {minute, _} = hd(Enum.sort_by(minute_map, &(-elem(&1, 1))))
+    minute
+  end
+
+  def do_find_sleepiest_minute([h|t], g, minute_map) do
+    l = parse_single_log(h)
+    do_process_sleepy(l.action, l, t, g, minute_map, nil, nil)
+  end
+
+  def do_process_sleepy("begins", l, [h|t], g, minute_map, _, _) do
+    new_log = parse_single_log(h)
+    do_process_sleepy(new_log.action, new_log, t, g, minute_map, l.guard, nil)
+  end
+
+  def do_process_sleepy("falls", l, [h|t], g, minute_map, current, _) do
+    new_log = parse_single_log(h)
+    do_process_sleepy(new_log.action, new_log, t, g, minute_map, current, l.minute)
+  end
+
+  def do_process_sleepy("wakes", l, [], g, minute_map, current, start) do
+    if g == current do
+      IO.puts("Recording minutes for #{g} @ #{start} to #{l.minute}")
+      record_minutes(minute_map, start, l.minute)
+    else
+      minute_map
+    end
+  end
+
+  def do_process_sleepy("wakes", l, [h|t], g, minute_map, current, start) do
+    new_log = parse_single_log(h)
+    do_process_sleepy(new_log.action, new_log, t, g, do_process_sleepy("wakes", l, [], g, minute_map, current, start), current, nil)
+  end
+
+  def record_minutes(minute_map, start_time, end_time) do
+    do_record_minutes(minute_map, Enum.to_list(start_time..end_time))
+  end
+
+  def do_record_minutes(minute_map, []), do: minute_map
+
+  def do_record_minutes(minute_map, [h|t]) do
+    if Map.has_key?(minute_map, h) do
+      do_record_minutes(Map.put(minute_map, h, minute_map[h] + 1), t)
+    else
+      do_record_minutes(Map.put_new(minute_map, h, 1), t)
+    end
   end
 end
 
 
 
-test_log = [
+guard_log = [
   "[1518-11-01 00:00] Guard #10 begins shift",
   "[1518-11-01 00:05] falls asleep",
   "[1518-11-01 00:25] wakes up",
@@ -87,8 +134,17 @@ test_log = [
   "[1518-11-05 00:55] wakes up",
 ]
 
-sleep_time_map = Guards.accumulate_sleep_times(test_log)
+guard_log =
+  File.stream!("guard_log.txt")
+  |> Stream.map(&String.trim/1)
+  |> Enum.to_list
+
+sleep_time_map = Guards.accumulate_sleep_times(guard_log)
+
 
 sorted = Enum.sort_by(sleep_time_map, &(-elem(&1, 1)))
+IO.inspect sorted
 {sleepiest_guard, _} = Enum.at(sorted,0)
-IO.inspect sleepiest_guard
+IO.puts("Sleepiest Guard is #{sleepiest_guard}")
+minute = Guards.find_sleepiest_minute(guard_log, sleepiest_guard)
+IO.puts("Final answer is: #{sleepiest_guard * minute}")
