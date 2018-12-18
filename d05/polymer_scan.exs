@@ -1,4 +1,17 @@
 defmodule Polymer do
+  def optimal_scan(p) do
+    char_list = Enum.to_list(?A..?Z)
+    do_optimal_scan(char_list, p, String.length(p))
+  end
+
+  def do_optimal_scan([], _, min), do: min
+
+  def do_optimal_scan([h|t], p, min) do
+    l = Enum.filter(String.graphemes(p), fn x -> :binary.first(String.upcase(x)) != h end)
+    size = length(do_scan(l, []))
+    if size < min, do: do_optimal_scan(t, p, size), else: do_optimal_scan(t, p, min)
+  end
+
   def scan(p) do
     l = do_scan(String.graphemes(p), [])
     length(l)
@@ -42,7 +55,9 @@ end
 0 = Polymer.scan("Aa")
 0 = Polymer.scan("aBbA")
 1 = Polymer.scan("gaBbA")
-
+0 = Polymer.optimal_scan("gaBbA")
+1 = Polymer.optimal_scan("gaBbAh")
+2 = Polymer.optimal_scan("gaBbAhii")
 
 poly = "dabAcCaCBAcCcaDA"
 10 = Polymer.scan(poly)
@@ -53,3 +68,5 @@ real_polymer =
   |> Enum.to_list
 
 IO.inspect(Polymer.scan(hd(real_polymer)))
+
+IO.puts("Optimized scan #{Polymer.optimal_scan(hd(real_polymer))}")
