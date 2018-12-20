@@ -4,13 +4,18 @@
 
 defmodule Coord do
   def build_grid(coords) do
-    max_x = Enum.max(Enum.map(coords, fn {x, _} -> x end))
-    max_y = Enum.max(Enum.map(coords, fn {_, y} -> y end))
+    {max_x, max_y} = grid_max(coords)
     IO.puts("Max x = #{max_x}, Max y = #{max_y}")
     g = do_build_grid(Enum.to_list(0..max_x), Enum.to_list(0..max_y), coords, %{})
     m = Map.values(g)
     |> Enum.reduce(%{}, fn x, acc -> Map.update(acc, x, 1, &(&1 + 1)) end)
     :maps.filter fn k, _ -> !infinite?(k, g, max_x, max_y) end, m
+  end
+
+  def grid_max(coords) do
+    max_x = Enum.max(Enum.map(coords, fn {x, _} -> x end))
+    max_y = Enum.max(Enum.map(coords, fn {_, y} -> y end))
+    {max_x, max_y}
   end
 
   def infinite?(coord, grid, max_x, max_y) do
@@ -53,12 +58,30 @@ defmodule Coord do
 
   def do_record_closest_neighbor(x, y, [h|t], min, winners) do
     d = distance({x,y}, h)
-    # IO.puts("min is #{min}, distance is #{d}, {x,y} = {#{x}, #{y}}, h is #{Enum.join(Tuple.to_list(h), ", ")}, winner is #{Enum.join(Tuple.to_list(winner), ", ")}")
     cond do
       d == min -> do_record_closest_neighbor(x, y, t, d, [h] ++ winners)
       d < min  -> do_record_closest_neighbor(x, y, t, d, [h])
       true     -> do_record_closest_neighbor(x, y, t, min, winners)
     end
+  end
+
+  def calculate_sum_of_distances(coords) do
+    {max_x, max_y} = grid_max(coords)
+    g = do_calculate_sums(Enum.to_list(0..max_x), Enum.to_list(0..max_y), coords, %{})
+  end
+
+  def do_calculate_sums([], _, _, sum_map), do: sum_map
+  def do_calculate_sums([x|x_t], y_list, coords, sum_map) do
+    do_calculate_sums(x_t, y_list, coords, do_calc_sum_single(x, y_list, coords, sum_map))
+  end
+
+  def do_calc_sum_single(_, [], _, sum_map), do: sum_map
+  def do_calc_sum_single(x, [y|y_t], coords, sum_map) do
+    do_calc_sum_single(x, y_t, coords, Map.put(sum_map, {x, y}, sum_distances({x, y}, coords)))
+  end
+
+  def sum_distances({x, y}, coords) do
+    Enum.reduce(coords, 0, fn c, acc -> distance(c, {x, y}) + acc end)
   end
 end
 
@@ -79,6 +102,13 @@ IO.inspect grid
 
 IO.puts("Max is #{ Enum.max(Map.values(grid))}")
 
+sum_grid = Coord.calculate_sum_of_distances(c)
+
+happy_grid = :maps.filter fn _, v -> v < 32 end, sum_grid
+
+IO.inspect happy_grid
+IO.puts("Happy location count is #{Map.size(happy_grid)}")
+
 real_coords =
   File.stream!("coordinates.txt")
   |> Stream.map(&String.trim/1)
@@ -91,3 +121,9 @@ IO.inspect grid
 
 IO.puts("Max is #{ Enum.max(Map.values(grid))}")
 
+sum_grid = Coord.calculate_sum_of_distances(real_coords)
+
+happy_grid = :maps.filter fn _, v -> v < 10000 end, sum_grid
+
+IO.inspect happy_grid
+IO.puts("Happy location count is #{Map.size(happy_grid)}")
